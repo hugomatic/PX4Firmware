@@ -12,12 +12,16 @@
 #define TEENSY0_DEVICE_PATH "/dev/teensy0"
 
 enum TEENSY_SENSOR_TYPE {
-	TEENSY_SENSOR_TYPE_TEST = 0
+	TEENSY_SENSOR_TYPE_TEST = 0,
+	TEENSY_SENSOR_TYPE_TEMPERATURE = 1,
+	TEENSY_SENSOR_TYPE_LIGHT = 2,
+	TEENSY_SENSOR_TYPE_RSSI = 3
 };
 
 struct teensy_sensor_report {
 	uint8_t type;
-	int16_t value;
+	int16_t i_value;
+	float	f_value;
 };
 
 /*

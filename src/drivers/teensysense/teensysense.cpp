@@ -35,7 +35,8 @@
 # error This requires CONFIG_SCHED_WORKQUEUE.
 #endif
 
-#define ADDR			PX4_I2C_OBDEV_TEENSY	/**< I2C adress of Teensy 3.x slave */
+//#define ADDR			PX4_I2C_OBDEV_TEENSY	/**< I2C adress of Teensy 3.x slave */
+#define ADDR            0x44
 #define CMD_MEASURE		0x10
 #define CMD_COLLECT		0x11
 #define CMD_TEST		0x40
@@ -56,6 +57,7 @@ private:
 
 	bool			_running;
 	bool			_should_run;
+	uint8_t			_type;
 
 	struct teensy_sensor_report _report;
 
@@ -140,8 +142,9 @@ TEENSYSENSE::ioctl(struct file *filp, int cmd, unsigned long arg)
 ssize_t
 TEENSYSENSE::read(struct file *filp, char *buffer, size_t buflen)
 {
-	memcpy(&_report, buffer, sizeof(struct teensy_sensor_report));
-	return sizeof(struct teensy_sensor_report);
+	struct teensy_sensor_report *teensy_buf = reinterpret_cast<struct teensy_sensor_report *>(buffer);
+	memcpy(teensy_buf, &_report, buflen);
+	return sizeof(*teensy_buf);
 }
 
 void
@@ -208,7 +211,7 @@ TEENSYSENSE::test()
 void
 TEENSYSENSE::readSingle()
 {
-	warnx("Read single value: %d", _report.value);
+	warnx("Read single value: %d", _report.i_value);
 }
 
 void
@@ -219,7 +222,7 @@ TEENSYSENSE::collect()
 	transfer(&cmd, 1, buf, 2);
 	int16_t result = ((buf[0] << 8) | buf[1]);
 	_report.type = TEENSY_SENSOR_TYPE_TEST;
-	_report.value = result;
+	_report.i_value = result;
 }
 
 void

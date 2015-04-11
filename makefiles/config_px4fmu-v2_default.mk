@@ -152,6 +152,7 @@ MODULES		+= examples/flow_position_estimator
 
 # Hardware test
 #MODULES			+= examples/hwtest
+MODULES     += modules/px4_teensytest
 
 # Generate parameter XML file
 GEN_PARAM_XML = 1
