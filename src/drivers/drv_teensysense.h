@@ -20,6 +20,7 @@ enum TEENSY_SENSOR_TYPE {
 
 struct teensy_sensor_report {
 	uint8_t type;
+	bool 	isnew;
 	int16_t i_value;
 	float	f_value;
 };

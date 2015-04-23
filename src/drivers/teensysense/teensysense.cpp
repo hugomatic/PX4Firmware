@@ -39,6 +39,7 @@
 #define ADDR            0x44
 #define CMD_MEASURE		0x10
 #define CMD_COLLECT		0x11
+#define CMD_TYPE		0x20
 #define CMD_TEST		0x40
 #define TEENSY_CONVERSION_INTERVAL	(100000)	/* microseconds */
 
@@ -58,6 +59,8 @@ private:
 	bool			_running;
 	bool			_should_run;
 	uint8_t			_type;
+	bool			_isnew;
+	bool			_healthy;
 
 	struct teensy_sensor_report _report;
 
@@ -84,7 +87,9 @@ extern "C" __EXPORT int teensysense_main(int argc, char *argv[]);
 TEENSYSENSE::TEENSYSENSE(int bus, int teensysense) :
 	I2C("teensysense", TEENSY0_DEVICE_PATH, bus, teensysense, 100000 /* maximum speed supported */),
 	_running(false),
-	_should_run(true)
+	_should_run(true),
+	_healthy(false),
+	_isnew(false)
 {
 	memset(&_work, 0, sizeof(_work));
 }
@@ -103,8 +108,20 @@ TEENSYSENSE::init()
 		return ret;
 	}
 
-	warnx("Teensy initialized");
+	// ask for type - use as liveness indicator
+	const uint8_t msg = CMD_TYPE;
+	uint8_t buf[4];
+	int result = transfer(&msg, 1, buf, 1);
+	if (result == OK) {
+		_type = buf[0];
+		_healthy = true;
+	}
+	else {
+		return result;
+	}
 
+	// we've made it this far
+	warnx("Teensy initialized");
 	return OK;
 }
 
@@ -218,11 +235,15 @@ void
 TEENSYSENSE::collect()
 {
 	const uint8_t cmd = CMD_COLLECT;
-	uint8_t buf[2];
-	transfer(&cmd, 1, buf, 2);
-	int16_t result = ((buf[0] << 8) | buf[1]);
-	_report.type = TEENSY_SENSOR_TYPE_TEST;
+	uint8_t buf[3];
+
+	transfer(&cmd, 1, buf, 3); // read three bytes
+	int16_t result = ((buf[0] << 8) | buf[1]); // unpack int result
+	_isnew = (buf[2] == 1); // set new flag (true if new value)
+
+	// put data in report 
 	_report.i_value = result;
+	_report.isnew = _isnew;
 }
 
 void
