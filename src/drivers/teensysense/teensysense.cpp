@@ -41,7 +41,7 @@
 #define CMD_COLLECT		0x11
 #define CMD_TYPE		0x20
 #define CMD_TEST		0x40
-#define TEENSY_CONVERSION_INTERVAL	(100000)	/* microseconds */
+#define TEENSY_CONVERSION_INTERVAL	(4000000)	/* microseconds */
 
 class TEENSYSENSE : public device::I2C
 {
@@ -239,7 +239,7 @@ TEENSYSENSE::collect()
 
 	transfer(&cmd, 1, buf, 3); // read three bytes
 	int16_t result = ((buf[0] << 8) | buf[1]); // unpack int result
-	_isnew = (buf[2] == 1); // set new flag (true if new value)
+	_isnew = ((buf[2] & 0x01) == 1); // set new flag (true if new value)
 
 	// put data in report 
 	_report.i_value = result;
