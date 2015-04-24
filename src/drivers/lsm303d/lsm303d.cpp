@@ -924,7 +924,7 @@ LSM303D::ioctl(struct file *filp, int cmd, unsigned long arg)
 	}
 
 	case ACCELIOCGLOWPASS:
-		return _accel_filter_x.get_cutoff_freq();
+		return static_cast<int>(_accel_filter_x.get_cutoff_freq());
 
 	case ACCELIOCSSCALE: {
 		/* copy scale, but only if off by a few percent */
@@ -1078,7 +1078,10 @@ LSM303D::mag_ioctl(struct file *filp, int cmd, unsigned long arg)
 		return mag_self_test();
 
 	case MAGIOCGEXTERNAL:
-		/* no external mag board yet */
+		/* Even if this sensor is on the "external" SPI bus
+		 * it is still fixed to the autopilot assembly,
+		 * so always return 0.
+		 */
 		return 0;
 
 	default:
@@ -1528,9 +1531,16 @@ LSM303D::measure()
 	accel_report.y_raw = raw_accel_report.y;
 	accel_report.z_raw = raw_accel_report.z;
 
-	float x_in_new = ((accel_report.x_raw * _accel_range_scale) - _accel_scale.x_offset) * _accel_scale.x_scale;
-	float y_in_new = ((accel_report.y_raw * _accel_range_scale) - _accel_scale.y_offset) * _accel_scale.y_scale;
-	float z_in_new = ((accel_report.z_raw * _accel_range_scale) - _accel_scale.z_offset) * _accel_scale.z_scale;
+	float xraw_f = raw_accel_report.x;
+	float yraw_f = raw_accel_report.y;
+	float zraw_f = raw_accel_report.z;
+
+	// apply user specified rotation
+	rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
+
+	float x_in_new = ((xraw_f * _accel_range_scale) - _accel_scale.x_offset) * _accel_scale.x_scale;
+	float y_in_new = ((yraw_f * _accel_range_scale) - _accel_scale.y_offset) * _accel_scale.y_scale;
+	float z_in_new = ((zraw_f * _accel_range_scale) - _accel_scale.z_offset) * _accel_scale.z_scale;
 
 	/*
 	  we have logs where the accelerometers get stuck at a fixed
@@ -1565,9 +1575,6 @@ LSM303D::measure()
 	accel_report.x = _accel_filter_x.apply(x_in_new);
 	accel_report.y = _accel_filter_y.apply(y_in_new);
 	accel_report.z = _accel_filter_z.apply(z_in_new);
-
-	// apply user specified rotation
-	rotate_3f(_rotation, accel_report.x, accel_report.y, accel_report.z);
 
 	accel_report.scaling = _accel_range_scale;
 	accel_report.range_m_s2 = _accel_range_m_s2;
@@ -1635,23 +1642,29 @@ LSM303D::mag_measure()
 	mag_report.x_raw = raw_mag_report.x;
 	mag_report.y_raw = raw_mag_report.y;
 	mag_report.z_raw = raw_mag_report.z;
-	mag_report.x = ((mag_report.x_raw * _mag_range_scale) - _mag_scale.x_offset) * _mag_scale.x_scale;
-	mag_report.y = ((mag_report.y_raw * _mag_range_scale) - _mag_scale.y_offset) * _mag_scale.y_scale;
-	mag_report.z = ((mag_report.z_raw * _mag_range_scale) - _mag_scale.z_offset) * _mag_scale.z_scale;
+
+	float xraw_f = mag_report.x_raw;
+	float yraw_f = mag_report.y_raw;
+	float zraw_f = mag_report.z_raw;
+
+	/* apply user specified rotation */
+	rotate_3f(_rotation, xraw_f, yraw_f, zraw_f);
+
+	mag_report.x = ((xraw_f * _mag_range_scale) - _mag_scale.x_offset) * _mag_scale.x_scale;
+	mag_report.y = ((yraw_f * _mag_range_scale) - _mag_scale.y_offset) * _mag_scale.y_scale;
+	mag_report.z = ((zraw_f * _mag_range_scale) - _mag_scale.z_offset) * _mag_scale.z_scale;
 	mag_report.scaling = _mag_range_scale;
 	mag_report.range_ga = (float)_mag_range_ga;
 	mag_report.error_count = perf_event_count(_bad_registers) + perf_event_count(_bad_values);
 
-	// remember the temperature. The datasheet isn't clear, but it
-	// seems to be a signed offset from 25 degrees C in units of 0.125C
-	_last_temperature = 25 + (raw_mag_report.temperature*0.125f);
-
-	// apply user specified rotation
-	rotate_3f(_rotation, mag_report.x, mag_report.y, mag_report.z);
+	/* remember the temperature. The datasheet isn't clear, but it
+	 * seems to be a signed offset from 25 degrees C in units of 0.125C
+	 */
+	_last_temperature = 25 + (raw_mag_report.temperature * 0.125f);
+	mag_report.temperature = _last_temperature;
 
 	_mag_reports->force(&mag_report);
 
-	/* XXX please check this poll_notify, is it the right one? */
 	/* notify anyone waiting for data */
 	poll_notify(POLLIN);
 
@@ -1688,7 +1701,7 @@ LSM303D::print_info()
                          (unsigned)_checked_values[i]);
             }
         }
-	::printf("temperature: %.2f\n", _last_temperature);
+	::printf("temperature: %.2f\n", (double)_last_temperature);
 }
 
 void
