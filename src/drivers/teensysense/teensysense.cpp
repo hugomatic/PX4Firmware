@@ -109,17 +109,18 @@ TEENSYSENSE::init()
 	}
 
 	// ask for type - use as liveness indicator
-	const uint8_t msg = CMD_TYPE;
-	uint8_t buf[4];
-	int result = transfer(&msg, 1, buf, 1);
-	if (result == OK) {
-		_type = buf[0];
-		_healthy = true;
-	}
-	else {
-		return result;
-	}
-
+	// const uint8_t msg = CMD_TYPE;
+	// uint8_t buf[4];
+	// int result = transfer(&msg, 1, buf, 1);
+	// if (result == OK) {
+	// 	_type = buf[0];
+	// 	_healthy = true;
+	// }
+	// else {
+	// 	return result;
+	// }
+	_type = 0;
+	_healthy = true;
 	// we've made it this far
 	warnx("Teensy initialized");
 	return OK;
